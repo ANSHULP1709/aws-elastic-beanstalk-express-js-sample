@@ -1,10 +1,9 @@
-
 pipeline {
   agent any
 
   environment {
     REGISTRY = "docker.io"
-    IMAGE    = "anshulp1709/eb-express-anshul"   // change if your Docker Hub username differs
+    IMAGE    = "anshulpatel1709/eb-express-anshul"   // change if needed
     TAG      = "build-${env.BUILD_NUMBER}"
     CREDS_ID = "dockerhub-creds"
   }
@@ -15,14 +14,38 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') { steps { checkout scm } }
+    stage('Checkout') {
+      steps { checkout scm }
+    }
 
-    stage('Install & Test (Node 16)') {
-      agent { docker { image 'node:16'; reuseNode true } }
+    stage('Install Node 16 (once per build)') {
       steps {
-        sh 'node -v && npm --version'
-        sh 'npm ci || npm install'
-        sh 'npm test || echo "No tests found, continuing..."'
+        sh '''
+          set -eux
+          if ! command -v node >/dev/null 2>&1; then
+            apt-get update
+            # Install curl + xz just in case
+            apt-get install -y curl xz-utils ca-certificates
+            # Install Node 16 LTS via NodeSource
+            curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+            apt-get install -y nodejs
+            node -v
+            npm -v
+          else
+            node -v
+            npm -v
+          fi
+        '''
+      }
+    }
+
+    stage('Install & Test') {
+      steps {
+        sh '''
+          set -eux
+          npm ci || npm install
+          npm test || echo "No tests found, continuing..."
+        '''
       }
       post {
         always {
